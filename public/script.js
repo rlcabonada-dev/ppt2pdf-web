@@ -16,38 +16,35 @@ drop.addEventListener('dragleave', e => { drop.classList.remove('drag'); });
 drop.addEventListener('drop', e => {
   e.preventDefault(); drop.classList.remove('drag');
   if (e.dataTransfer.files && e.dataTransfer.files.length) {
-    // Append dropped files to currentFiles (avoid duplicates by name)
-    const dropped = Array.from(e.dataTransfer.files);
-    for (const f of dropped) {
-      if (!currentFiles.some(existing => existing.name === f.name && existing.size === f.size)) {
-        currentFiles.push(f);
-      }
-    }
-    try { fileInput.files = createFileList(currentFiles); } catch (e) { /* ignore if not supported */ }
-    renderFileList();
-    // clear native input so picking the same file again will fire change
-    try { fileInput.value = ''; } catch (e) {}
+    addFiles(Array.from(e.dataTransfer.files));
   }
 });
-
-// clicking drop area should open file picker
-if (drop) drop.addEventListener('click', () => { try { fileInput.click(); } catch (e) {} });
 
 fileInput.addEventListener('change', () => {
-  if (fileInput.files.length) {
-    // append new selections to current list (avoid duplicates)
-    const picked = Array.from(fileInput.files);
-    for (const f of picked) {
-      if (!currentFiles.some(existing => existing.name === f.name && existing.size === f.size)) {
-        currentFiles.push(f);
-      }
-    }
-    try { fileInput.files = createFileList(currentFiles); } catch (e) { /* ignore if not allowed */ }
-    renderFileList();
-    // allow selecting the same file again by clearing the underlying input
-    try { fileInput.value = ''; } catch (e) {}
+  if (fileInput.files && fileInput.files.length) {
+    addFiles(Array.from(fileInput.files));
   }
+  try { fileInput.value = ''; } catch (e) {}
 });
+
+// Centralized file adding helper to avoid inconsistent state when selecting same file repeatedly
+function addFiles(filesArray) {
+  if (!filesArray || filesArray.length === 0) return;
+  let added = 0;
+  for (const f of filesArray) {
+    // Basic validation: must be ppt/pptx
+    const ext = (f.name || '').split('.').pop().toLowerCase();
+    if (!(ext === 'ppt' || ext === 'pptx')) continue;
+    // avoid duplicates by name+size+lastModified
+    if (!currentFiles.some(existing => existing.name === f.name && existing.size === f.size && existing.lastModified === f.lastModified)) {
+      currentFiles.push(f);
+      added++;
+    }
+  }
+  try { fileInput.files = createFileList(currentFiles); } catch (e) { /* ignore */ }
+  // clear native input so picking the same file again will fire change
+  if (added > 0) renderFileList();
+}
 
 // Reset button clears selection
 resetBtn.addEventListener('click', () => {
@@ -179,7 +176,7 @@ function renderFileList() {
   });
 
   fileListEl.appendChild(grid);
-  status.textContent = currentFiles.length === 1 ? currentFiles[0].name : `${currentFiles.length} files selected`;
+  status.textContent = `${currentFiles.length} file(s) selected`;
   // show reset button when at least one file selected
   if (resetBtn) resetBtn.hidden = false;
   // change drop area to compact add-tile
@@ -219,8 +216,7 @@ function resetSelection() {
   if (resetBtn) resetBtn.hidden = true;
   status.textContent = 'Ready';
   restoreDropDefault();
-  // ensure render reflects cleared state
-  renderFileList();
+  return;
 }
 
 // Utility: create a DataTransfer-based FileList from an array of File objects
