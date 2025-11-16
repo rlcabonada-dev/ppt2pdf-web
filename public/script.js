@@ -23,10 +23,13 @@ drop.addEventListener('drop', e => {
         currentFiles.push(f);
       }
     }
-    fileInput.files = createFileList(currentFiles);
+    try { fileInput.files = createFileList(currentFiles); } catch (e) { /* ignore if not supported */ }
     renderFileList();
   }
 });
+
+// clicking drop area should open file picker
+if (drop) drop.addEventListener('click', () => { try { fileInput.click(); } catch (e) {} });
 
 fileInput.addEventListener('change', () => {
   if (fileInput.files.length) {
@@ -37,7 +40,7 @@ fileInput.addEventListener('change', () => {
         currentFiles.push(f);
       }
     }
-    fileInput.files = createFileList(currentFiles);
+    try { fileInput.files = createFileList(currentFiles); } catch (e) { /* ignore if not allowed */ }
     renderFileList();
   }
 });
@@ -125,39 +128,77 @@ function renderFileList() {
     status.textContent = 'Ready';
     // hide reset button when no files selected
     if (resetBtn) resetBtn.hidden = true;
+    // restore drop area to full mode
+    restoreDropDefault();
     return;
   }
-  const ul = document.createElement('ul');
-  ul.className = 'files';
+
+  const grid = document.createElement('div');
+  grid.className = 'previews';
+
   currentFiles.forEach((f, idx) => {
-    const li = document.createElement('li');
-    li.className = 'file-item';
-    const name = document.createElement('span');
-    name.textContent = f.name;
-    name.title = f.name;
+    const p = document.createElement('div');
+    p.className = 'preview';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'preview-wrap';
+
     const remove = document.createElement('button');
-    remove.className = 'remove';
+    remove.className = 'preview-remove';
     remove.type = 'button';
     remove.setAttribute('aria-label', `Remove ${f.name}`);
     remove.textContent = '✖';
-    remove.addEventListener('click', () => {
-      removeFileAt(idx);
-    });
-    li.appendChild(name);
-    li.appendChild(remove);
-    ul.appendChild(li);
+    remove.addEventListener('click', () => { removeFileAt(idx); });
+
+    const thumb = document.createElement('div');
+    thumb.className = 'preview-thumb';
+
+    const img = document.createElement('img');
+    img.alt = f.name;
+    img.src = makePlaceholder(getExt(f.name));
+
+    thumb.appendChild(img);
+    wrap.appendChild(remove);
+    wrap.appendChild(thumb);
+
+    const fname = document.createElement('div');
+    fname.className = 'preview-filename';
+    fname.textContent = f.name;
+
+    p.appendChild(wrap);
+    p.appendChild(fname);
+    grid.appendChild(p);
+
+    // Request server-side preview generation (first slide image)
+    (async () => {
+      try {
+        const fd = new FormData();
+        fd.append('file', f);
+        const resp = await fetch('/preview', { method: 'POST', body: fd });
+        if (!resp.ok) return; // keep placeholder
+        const json = await resp.json();
+        if (json && json.previewUrl) {
+          img.src = json.previewUrl;
+        }
+      } catch (e) {
+        // ignore and keep placeholder
+      }
+    })();
   });
-  fileListEl.appendChild(ul);
+
+  fileListEl.appendChild(grid);
   status.textContent = currentFiles.length === 1 ? currentFiles[0].name : `${currentFiles.length} files selected`;
   // show reset button when at least one file selected
   if (resetBtn) resetBtn.hidden = false;
+  // change drop area to compact add-tile
+  setDropCompact();
 }
 
 function removeFileAt(index) {
   if (index < 0 || index >= currentFiles.length) return;
   currentFiles.splice(index, 1);
   // update the hidden fileInput to reflect currentFiles
-  fileInput.files = createFileList(currentFiles);
+  try { fileInput.files = createFileList(currentFiles); } catch (e) { /* ignore */ }
   renderFileList();
 }
 
@@ -179,6 +220,16 @@ function createFileList(files) {
     // DataTransfer may not be available in some environments; return existing input.files
     return fileInput.files;
   }
+}
+
+function getExt(name) {
+  return (name || '').split('.').pop().toLowerCase();
+}
+
+function makePlaceholder(ext) {
+  const label = (ext || 'ppt').toUpperCase();
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%' height='100%' fill='%2309141a'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='40' fill='%23cfeaff'>${label}</text></svg>`;
+  return 'data:image/svg+xml;base64,' + btoa(svg);
 }
 
 // initial render
