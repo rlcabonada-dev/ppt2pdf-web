@@ -25,6 +25,8 @@ drop.addEventListener('drop', e => {
     }
     try { fileInput.files = createFileList(currentFiles); } catch (e) { /* ignore if not supported */ }
     renderFileList();
+    // clear native input so picking the same file again will fire change
+    try { fileInput.value = ''; } catch (e) {}
   }
 });
 
@@ -42,6 +44,8 @@ fileInput.addEventListener('change', () => {
     }
     try { fileInput.files = createFileList(currentFiles); } catch (e) { /* ignore if not allowed */ }
     renderFileList();
+    // allow selecting the same file again by clearing the underlying input
+    try { fileInput.value = ''; } catch (e) {}
   }
 });
 
@@ -153,6 +157,7 @@ function renderFileList() {
     const thumb = document.createElement('div');
     thumb.className = 'preview-thumb';
 
+    // Start with a static placeholder
     const img = document.createElement('img');
     img.alt = f.name;
     img.src = makePlaceholder(getExt(f.name));
@@ -169,21 +174,8 @@ function renderFileList() {
     p.appendChild(fname);
     grid.appendChild(p);
 
-    // Request server-side preview generation (first slide image)
-    (async () => {
-      try {
-        const fd = new FormData();
-        fd.append('file', f);
-        const resp = await fetch('/preview', { method: 'POST', body: fd });
-        if (!resp.ok) return; // keep placeholder
-        const json = await resp.json();
-        if (json && json.previewUrl) {
-          img.src = json.previewUrl;
-        }
-      } catch (e) {
-        // ignore and keep placeholder
-      }
-    })();
+    // Request server-side PDF generation and client-side PDF.js rendering for preview
+    renderPptPreviewFromPdfBytes(f, thumb); // Changed imgElement to thumb to directly replace content
   });
 
   fileListEl.appendChild(grid);
@@ -192,6 +184,20 @@ function renderFileList() {
   if (resetBtn) resetBtn.hidden = false;
   // change drop area to compact add-tile
   setDropCompact();
+}
+
+// Toggle drop area to a compact 'add more' state
+function setDropCompact() {
+  if (!drop) return;
+  drop.classList.add('compact');
+  drop.style.minHeight = '84px';
+}
+
+// Restore the drop area to its original large appearance
+function restoreDropDefault() {
+  if (!drop) return;
+  drop.classList.remove('compact');
+  drop.style.minHeight = '';
 }
 
 function removeFileAt(index) {
@@ -203,11 +209,18 @@ function removeFileAt(index) {
 }
 
 function resetSelection() {
+  // Clear state and UI immediately so filenames are not visible after reset
   currentFiles = [];
-  fileInput.value = '';
-  renderFileList();
-  result.innerHTML = '';
+  try { fileInput.value = ''; } catch (e) {}
+  // wipe preview/file list and result immediately
+  try { fileListEl.innerHTML = ''; } catch (e) {}
+  try { result.innerHTML = ''; } catch (e) {}
+  // hide reset button and restore drop area
+  if (resetBtn) resetBtn.hidden = true;
   status.textContent = 'Ready';
+  restoreDropDefault();
+  // ensure render reflects cleared state
+  renderFileList();
 }
 
 // Utility: create a DataTransfer-based FileList from an array of File objects
@@ -230,6 +243,55 @@ function makePlaceholder(ext) {
   const label = (ext || 'ppt').toUpperCase();
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%' height='100%' fill='%2309141a'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='40' fill='%23cfeaff'>${label}</text></svg>`;
   return 'data:image/svg+xml;base64,' + btoa(svg);
+}
+
+// Upload a PPT/PPTX to the server, get PDF bytes, and render first page client-side with PDF.js
+async function renderPptPreviewFromPdfBytes(file, thumbElement) {
+  if (!file || !thumbElement) return;
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+
+    // show loading placeholder
+    thumbElement.innerHTML = '';
+    const loading = document.createElement('div');
+    loading.style.width = '100%'; loading.style.height = '100%'; loading.style.display = 'flex'; loading.style.alignItems = 'center'; loading.style.justifyContent = 'center'; loading.style.color = '#9ab';
+    loading.textContent = 'Rendering...';
+    thumbElement.appendChild(loading);
+
+    const resp = await fetch('/preview-pdf', { method: 'POST', body: fd });
+    if (!resp.ok) {
+      console.warn('preview-pdf failed', resp.status);
+      thumbElement.innerHTML = `<div style="font-size:0.8rem;color:#d66;text-align:center;padding:5px;">No Preview</div>`;
+      return;
+    }
+
+    const arrayBuffer = await resp.arrayBuffer();
+    const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdfDoc.getPage(1);
+    const viewport = page.getViewport({ scale: 1 });
+
+    const targetHeight = thumbElement.clientHeight || 84;
+    const scale = targetHeight / viewport.height;
+    const scaledViewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = Math.ceil(scaledViewport.width);
+    canvas.height = Math.ceil(scaledViewport.height);
+
+    await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+
+    // place canvas into thumb
+    thumbElement.innerHTML = '';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.display = 'block';
+    thumbElement.appendChild(canvas);
+  } catch (err) {
+    console.warn('renderPptPreviewFromPdfBytes error', err);
+    thumbElement.innerHTML = `<div style="font-size:0.8rem;color:#d66;text-align:center;padding:5px;">No Preview</div>`;
+  }
 }
 
 // initial render

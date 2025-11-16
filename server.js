@@ -175,28 +175,30 @@ app.post('/convert', upload.array('file', 50), async (req, res) => {
   }
 });
 
-// Preview endpoint: accepts a single PPT/PPTX and returns a URL to the first-slide PNG
-app.post('/preview', upload.single('file'), async (req, res) => {
+// Preview as PDF bytes: convert PPT/PPTX to PDF and return PDF bytes (no file served)
+app.post('/preview-pdf', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
   const uploadedPath = req.file.path;
   const originalName = req.file.originalname;
-  const workdir = path.join(os.tmpdir(), 'ppt_preview_' + uuidv4());
+  const workdir = path.join(os.tmpdir(), 'ppt_preview_pdf_' + uuidv4());
   try {
     fs.mkdirSync(workdir, { recursive: true });
     const inPath = path.join(workdir, originalName);
     fs.renameSync(uploadedPath, inPath);
 
-    // convert to PNG (LibreOffice will export slides as PNG files)
-    const args = ['--headless', '--invisible', '--convert-to', 'png', '--outdir', workdir, inPath];
-    const soffice = spawn(SOFFICE_BIN, args);
+    const args = ['--headless', '--invisible', '--convert-to', 'pdf', '--outdir', workdir, inPath];
+    const soffice = spawn(SOFFICE_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     const timeout = setTimeout(() => { try { soffice.kill(); } catch (e) {} }, 120000);
 
+    let stdout = '';
     let stderr = '';
-    soffice.stderr && soffice.stderr.on('data', d => { stderr += d.toString(); });
+    if (soffice.stdout) soffice.stdout.on('data', d => { stdout += d.toString(); });
+    if (soffice.stderr) soffice.stderr.on('data', d => { stderr += d.toString(); });
 
     soffice.on('error', (err) => {
       clearTimeout(timeout);
+      console.error('[preview-pdf] soffice spawn error', err && err.stack ? err.stack : err);
       cleanup(workdir);
       return res.status(500).json({ error: 'Failed to start LibreOffice (soffice).', detail: err.message });
     });
@@ -204,47 +206,36 @@ app.post('/preview', upload.single('file'), async (req, res) => {
     soffice.on('close', (code) => {
       clearTimeout(timeout);
       try {
-        const images = fs.readdirSync(workdir).filter(f => /\.png$/i.test(f));
-        if (images.length === 0) {
+        console.log('[preview-pdf] soffice exit code', code);
+        if (stdout) console.log('[preview-pdf] soffice stdout:', stdout.trim());
+        if (stderr) console.log('[preview-pdf] soffice stderr:', stderr.trim());
+
+        const pdfs = fs.readdirSync(workdir).filter(f => /\.pdf$/i.test(f));
+        console.log('[preview-pdf] pdfs produced:', pdfs);
+        if (pdfs.length === 0) {
           cleanup(workdir);
-          return res.status(500).json({ error: 'Preview generation failed: no image produced.', detail: stderr });
+          return res.status(500).json({ error: 'Preview PDF generation failed: no PDF produced.', detail: stderr });
         }
-        // pick the first image (LibreOffice typically names slides as <basename>.png or <basename>-0001.png)
-        images.sort();
-        const imgPath = path.join(workdir, images[0]);
 
-        // copy to filesDir for serving
-        const filesDir = path.join(os.tmpdir(), 'ppt2pdf_preview_files');
-        fs.mkdirSync(filesDir, { recursive: true });
-        const id = uuidv4();
-        const destName = id + path.extname(imgPath);
-        const destPath = path.join(filesDir, destName);
-        fs.copyFileSync(imgPath, destPath);
-
-        previewFiles[id] = destPath;
-        // schedule cleanup
-        setTimeout(() => { try { fs.unlinkSync(destPath); } catch (e) {} delete previewFiles[id]; }, 10 * 60 * 1000);
-
+        const pdfPath = path.join(workdir, pdfs[0]);
+        const buf = fs.readFileSync(pdfPath);
         cleanup(workdir);
-        return res.json({ success: true, previewUrl: `/preview/${id}` });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Length', buf.length);
+        return res.send(buf);
       } catch (err) {
+        console.error('[preview-pdf] error assembling pdf', err && err.stack ? err.stack : err);
         cleanup(workdir);
-        return res.status(500).json({ error: 'Server error during preview generation.' });
+        return res.status(500).json({ error: 'Server error during preview-pdf generation.' });
       }
     });
+
   } catch (err) {
     try { fs.unlinkSync(uploadedPath); } catch (e) {}
     cleanup(workdir);
     return res.status(500).json({ error: 'Server error.' });
   }
-});
-
-// Serve preview image
-app.get('/preview/:id', (req, res) => {
-  const id = req.params.id;
-  const p = previewFiles[id];
-  if (!p || !fs.existsSync(p)) return res.status(404).send('Preview not found or expired.');
-  res.sendFile(p);
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
